@@ -156,20 +156,40 @@ def _gdrive_file_id(url: str) -> str | None:
 
 def _download_gdrive(file_id: str, dest: Path) -> None:
     """
-    Download a (potentially large) Google Drive file, bypassing the virus-scan
-    confirmation page that Google shows for files over ~100 MB.
+    Download a Google Drive file, trying multiple URL patterns and validating
+    the response is actually a file (not an HTML confirmation page).
     """
     session = requests.Session()
 
-    # First request — may return a confirmation page for large files
-    dl_url = f"https://drive.usercontent.google.com/download?id={file_id}&export=download&authuser=0&confirm=t"
-    resp = session.get(dl_url, stream=True, timeout=300, headers=HEADERS)
-    resp.raise_for_status()
+    urls_to_try = [
+        f"https://drive.usercontent.google.com/download?id={file_id}&export=download&confirm=t&authuser=0",
+        f"https://drive.google.com/uc?export=download&id={file_id}&confirm=t",
+        f"https://drive.google.com/uc?export=download&id={file_id}",
+    ]
 
-    # Stream to disk in chunks so we don't blow memory
+    resp = None
+    for url in urls_to_try:
+        r = session.get(url, stream=True, timeout=300, headers=HEADERS)
+        if r.status_code == 200:
+            # Peek at first bytes to make sure it's not an HTML page
+            first_chunk = next(r.iter_content(chunk_size=512), b"")
+            if first_chunk and not first_chunk.lstrip().startswith(b"<!"):
+                resp = (first_chunk, r)
+                break
+            r.close()
+
+    if resp is None:
+        raise RuntimeError(
+            "Could not download file from Google Drive — "
+            "all URLs returned an HTML page instead of the file. "
+            "Check that the file is shared as 'Anyone with the link'."
+        )
+
+    first_chunk, r = resp
     dest.parent.mkdir(parents=True, exist_ok=True)
     with open(dest, "wb") as fh:
-        for chunk in resp.iter_content(chunk_size=1024 * 1024):   # 1 MB chunks
+        fh.write(first_chunk)
+        for chunk in r.iter_content(chunk_size=1024 * 1024):
             if chunk:
                 fh.write(chunk)
 
