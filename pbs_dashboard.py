@@ -46,8 +46,7 @@ DATA_FILE = Path(r"G:\My Drive\PBS Pricing\full data\combined_df.csv")
 #
 # When running LOCALLY: keep this as None — the dashboard reads directly from DATA_FILE above.
 # When deployed to STREAMLIT CLOUD: paste your Google Drive share URL here.
-CLOUD_URL: str | None = None
-# CLOUD_URL: str | None = "https://drive.google.com/file/d/1UA7_JqQHi-f-lHF5I09Tr5gTo9-m8yH3/view?usp=sharing"
+CLOUD_URL: str | None = "https://drive.google.com/file/d/1UA7_JqQHi-f-lHF5I09Tr5gTo9-m8yH3/view?usp=sharing"
 CACHE_FILE = Path(__file__).parent / "_combined_df_cache.parquet"
 
 # ─── PBS config ────────────────────────────────────────────────────────────────
