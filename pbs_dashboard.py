@@ -31,7 +31,7 @@ from plotly.subplots import make_subplots
 #   If the file lives in a OneDrive / Google Drive synced folder, edits made by
 #   update_pbs_data.py will automatically sync to the cloud.
 #
-DATA_FILE = Path(r"G:\My Drive\PBS Pricing\full data\combined_df.csv")
+DATA_FILE = Path(__file__).parent / "combined_df_slim.csv.gz"
 #
 # Option B — Cloud download URL (OneDrive, Google Drive, Dropbox).
 #   Leave as None to use DATA_FILE above.
@@ -46,7 +46,7 @@ DATA_FILE = Path(r"G:\My Drive\PBS Pricing\full data\combined_df.csv")
 #
 # When running LOCALLY: keep this as None — the dashboard reads directly from DATA_FILE above.
 # When deployed to STREAMLIT CLOUD: paste your Google Drive share URL here.
-CLOUD_URL: str | None = "https://drive.google.com/file/d/1xW2j__rroiz35SZ6EaN5ZI_xaLd_IZAR/view?usp=sharing"
+CLOUD_URL: str | None = None
 CACHE_FILE = Path(__file__).parent / "_combined_df_cache.csv.gz"
 
 # ─── PBS config ────────────────────────────────────────────────────────────────
