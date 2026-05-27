@@ -46,8 +46,8 @@ DATA_FILE = Path(r"G:\My Drive\PBS Pricing\full data\combined_df.csv")
 #
 # When running LOCALLY: keep this as None — the dashboard reads directly from DATA_FILE above.
 # When deployed to STREAMLIT CLOUD: paste your Google Drive share URL here.
-CLOUD_URL: str | None = "https://drive.google.com/file/d/1UA7_JqQHi-f-lHF5I09Tr5gTo9-m8yH3/view?usp=sharing"
-CACHE_FILE = Path(__file__).parent / "_combined_df_cache.parquet"
+CLOUD_URL: str | None = "https://drive.google.com/file/d/1xW2j__rroiz35SZ6EaN5ZI_xaLd_IZAR/view?usp=sharing"
+CACHE_FILE = Path(__file__).parent / "_combined_df_cache.csv.gz"
 
 # ─── PBS config ────────────────────────────────────────────────────────────────
 BASE_URL = "https://www.pbs.gov.au/industry/pricing/ex-manufacturer-price"
@@ -239,9 +239,9 @@ def load_data() -> pd.DataFrame:
                 pass
         return "latin-1"   # latin-1 never raises, accepts any byte
 
-    # Parquet files are pre-filtered and much smaller — load directly
-    if path.suffix.lower() == ".parquet":
-        df = pd.read_parquet(path)
+    # Slim gzip CSV — pre-filtered, much smaller than full CSV
+    if path.suffix.lower() == ".gz" or str(path).endswith(".csv.gz"):
+        df = pd.read_csv(path, compression="gzip", low_memory=False)
     else:
         enc = detect_encoding(path)
         WANTED = ["price_date", "source", "item_code", "drug_name", "brand_name",
