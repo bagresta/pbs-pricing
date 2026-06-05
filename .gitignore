@@ -1,0 +1,7 @@
+_combined_df_cache*
+full data/
+archieve/
+*.R
+DEPLOY_GUIDE.md
+READ_ME.txt
+.streamlit/
