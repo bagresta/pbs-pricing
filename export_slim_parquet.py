@@ -18,6 +18,16 @@ BACKCALC_NOTES below for the validated formula and its accuracy. This runs
 every time (not a one-off), so it's always current with whatever's in
 full data/presplit.csv - no separate R script or manual step needed.
 
+TWO MONTHS PBS NEVER PUBLISHED AN UPDATE FOR
+-----------------------------------------------
+1 February 2012 and 1 November 2012 have no PTP at all in the raw source
+(source tag "presplitmiss"), so the back-calculation above can't touch them.
+This isn't a scrape failure - PBS's own ex-manufacturer-price page says, for
+both months: "No updates this month - please refer to [prior month] prices
+below." dpmq_dpma for these rows is a byte-for-byte carry-forward of the
+prior month (verified), so the correct AEMP is likewise just the prior
+month's AEMP, carried forward per item_code - see fill_no_update_months().
+
 Usage
 -----
     python export_slim_parquet.py
@@ -42,6 +52,10 @@ SOURCE_NORMALISE = {
     "nonefc":   "non_efc",
 }
 
+# Source tag PBS itself used (via our scrape) for months where the ex-manufacturer
+# price page said "No updates this month - please refer to [prior month] prices".
+NO_UPDATE_SOURCE_TAG = "presplitmiss"
+
 # ─── AEMP back-calculation parameters (validated against ~3,600 items whose
 #     PTP->AEMP handover happened within 35 days of the Oct2012/Aug2013
 #     changeover - see backcalculate_aemp_from_ptp.R for the full derivation
@@ -63,6 +77,11 @@ BACKCALC_NOTES = """
   back-calculated - PTP:AEMP ratios for these vary per item in a way
   consistent with a pricing-quantity/vial-content unit mismatch, not a
   mark-up formula (0% match to either formula above).
+
+  Feb 2012 and Nov 2012: PBS published no price update at all for these
+  months (confirmed on pbs.gov.au's ex-manufacturer-price page). AEMP is
+  carried forward from the prior month, per item_code, since dpmq_dpma for
+  these rows is already an identical carry-forward of the prior month.
 """
 
 WHOLESALE_RATE   = 0.0752
@@ -167,7 +186,35 @@ def fill_historical_aemp_gap(df: pd.DataFrame) -> pd.DataFrame:
     print(f"  Back-calculated AEMP for {n_filled:,} rows.")
     print("  aemp_source breakdown:")
     print(df["aemp_source"].value_counts().to_string())
-    print(BACKCALC_NOTES)
+    return df
+
+
+def fill_no_update_months(df: pd.DataFrame) -> pd.DataFrame:
+    """Fill AEMP for rows tagged as a PBS 'no updates this month' carry-forward
+    (currently: Feb 2012, Nov 2012 - source == 'presplitmiss'). These months
+    have no PTP at all, so fill_historical_aemp_gap() can't touch them - but
+    PBS's own page says these months are identical to the prior month, and
+    dpmq_dpma for these rows is already a verified byte-for-byte carry-forward
+    of the prior month's dpmq_dpma. So the correct AEMP is likewise the prior
+    month's AEMP, carried forward per item_code - not a fresh estimate, just
+    reusing the number PBS itself says didn't change."""
+    still_missing = df["aemp_source"] == "still_missing"
+    no_update_rows = still_missing & (df["source"] == NO_UPDATE_SOURCE_TAG)
+    if not no_update_rows.any():
+        return df
+
+    df = df.sort_values(["item_code", "price_date"]).reset_index(drop=True)
+    carried = df.groupby("item_code")["aemp"].ffill()
+
+    apply_mask = (df["aemp_source"] == "still_missing") & (df["source"] == NO_UPDATE_SOURCE_TAG)
+    apply_mask = apply_mask & carried.notna()
+    n_carried = int(apply_mask.sum())
+
+    df.loc[apply_mask, "aemp"] = carried[apply_mask]
+    df.loc[apply_mask, "aemp_source"] = "carried_forward_pbs_no_update"
+
+    print(f"\n  Carried forward AEMP for {n_carried:,} rows PBS itself flagged as "
+          f"'no updates this month' (source == '{NO_UPDATE_SOURCE_TAG}').")
     return df
 
 
@@ -200,6 +247,14 @@ def main():
     # Back-fill AEMP for the Apr 2007 - Aug 2013 gap, every run - permanent
     # and self-refreshing, no separate manual/R step needed.
     df = fill_historical_aemp_gap(df)
+
+    # Then carry forward AEMP for the two "PBS published no update" months
+    # that the step above can't reach (no PTP exists for them at all).
+    df = fill_no_update_months(df)
+
+    print("\n  Final aemp_source breakdown:")
+    print(df["aemp_source"].value_counts().to_string())
+    print(BACKCALC_NOTES)
 
     df = df.sort_values("price_date").reset_index(drop=True)
 
